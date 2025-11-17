@@ -1,1 +1,1 @@
-# istio-exercise
+# cicd-exercise
