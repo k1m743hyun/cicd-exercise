@@ -1,4 +1,4 @@
-version: "3.8"
+version: '3.8'
 
 services:
   gitlab:
@@ -6,21 +6,59 @@ services:
     container_name: gitlab
     restart: always
     hostname: gitlab.local
+    privileged: true
+    userns_mode: host
+    security_opt:
+      - label=disable
+      - seccomp=unconfined
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://gitlab.local'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        gitlab_rails['time_zone'] = 'Asia/Seoul'
+        
+        # 성능 최적화 (소규모 팀)
+        puma['worker_processes'] = 2
+        sidekiq['max_concurrency'] = 10
+        prometheus_monitoring['enable'] = false
     ports:
-      - "8080:80"     # 웹 UI
-      - "8443:443"    # HTTPS
-      - "2222:22"     # SSH
+      - '80:80'
+      - '443:443'
+      - '2222:22'
     volumes:
-      - /var/gitlab/config:/etc/gitlab
-      - /var/gitlab/logs:/var/log/gitlab
-      - /var/gitlab/data:/var/opt/gitlab
+      - gitlab_config:/etc/gitlab
+      - gitlab_logs:/var/log/gitlab
+      - gitlab_data:/var/opt/gitlab
+    networks:
+      - gitlab-network
+    shm_size: '256m'
 
   gitlab-runner:
-    image: gitlab/gitlab-runner:alpine
+    image: gitlab/gitlab-runner:latest
     container_name: gitlab-runner
     restart: always
+    privileged: true
+    security_opt:
+      - label=disable
+    volumes:
+      - gitlab_runner_config:/etc/gitlab-runner
+      - /var/run/podman/podman.sock:/var/run/docker.sock
+    networks:
+      - gitlab-network
     depends_on:
       - gitlab
-    volumes:
-      - /var/gitlab-runner/config:/etc/gitlab-runner
-      - /var/run/docker.sock:/var/run/docker.sock   # Docker-in-Docker 아님. Host Docker 사용
+
+networks:
+  gitlab-network:
+    driver: bridge
+
+volumes:
+  gitlab_config:
+  gitlab_logs:
+  gitlab_data:
+  gitlab_runner_config:
+
+# podman exec gitlab cat /etc/gitlab/initial_root_password
+# Password: PgRDAyI9RKgoTQ/P46sSDdPS64KVSeExLSvQg5UOSxM=
+
+# podman exec gitlab-runner gitlab-runner register --non-interactive --url "http://gitlab" --registration-token "GR1348941Pc999zNbGbp6_a3XDbWr" --executor "docker" --docker-image "gradle:7.6-jdk8" --description "docker-runner" --tag-list "docker,gradle" --docker-privileged --docker-network-mode "cicd-exercise_gitlab-network" --docker-volumes "/cache" --docker-volumes "/var/run/docker.sock:/var/run/docker.sock" --clone-url "http://gitlab"
