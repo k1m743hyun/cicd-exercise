@@ -1,0 +1,51 @@
+stages:
+  - build
+  - package
+  - deploy
+
+variables:
+  IMAGE_NAME: "demo-app"
+
+build:
+  stage: build
+  image: gradle:7.6-jdk8
+  tags:
+    - docker
+  script:
+    - gradle clean build -x test
+  artifacts:
+    paths:
+      - build/libs/*.war
+    expire_in: 1 hour
+
+package:
+  stage: package
+  image: docker:24.0    # 버전 고정
+  tags:
+    - docker
+  script:
+    - docker build --load -t $IMAGE_NAME:$CI_COMMIT_SHORT_SHA .
+    - docker tag $IMAGE_NAME:$CI_COMMIT_SHORT_SHA $IMAGE_NAME:latest
+    - docker images | grep $IMAGE_NAME
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^deploy\/.+$/
+
+deploy:
+  stage: deploy
+  image: docker:24.0    # 버전 고정
+  tags:
+    - docker
+  script:
+    - ENV_NAME=$(echo $CI_COMMIT_BRANCH | sed 's/deploy\///' | tr '[:lower:]' '[:upper:]')
+    - echo "Environment is $ENV_NAME"
+    - PORT_VAR="${ENV_NAME}_PORT"
+    - APP_PORT=$(eval echo \$$PORT_VAR)
+    - echo "Port is $APP_PORT"
+    - if [ -z "$APP_PORT" ]; then echo "ERROR - Port not defined"; exit 1; fi
+    - docker stop demo-${ENV_NAME} || true
+    - docker rm demo-${ENV_NAME} || true
+    - docker run -d --name demo-${ENV_NAME} -p ${APP_PORT}:8080 -e SPRING_PROFILES_ACTIVE=${ENV_NAME} $IMAGE_NAME:$CI_COMMIT_SHORT_SHA
+    - echo "Deployed to port $APP_PORT"
+    - docker ps
+  rules:
+    - if: $CI_COMMIT_BRANCH =~ /^deploy\/.+$/

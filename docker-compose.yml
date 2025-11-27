@@ -62,3 +62,8 @@ volumes:
 # Password: PgRDAyI9RKgoTQ/P46sSDdPS64KVSeExLSvQg5UOSxM=
 
 # podman exec gitlab-runner gitlab-runner register --non-interactive --url "http://gitlab" --registration-token "GR1348941Pc999zNbGbp6_a3XDbWr" --executor "docker" --docker-image "gradle:7.6-jdk8" --description "docker-runner" --tag-list "docker,gradle" --docker-privileged --docker-network-mode "cicd-exercise_gitlab-network" --docker-volumes "/cache" --docker-volumes "/var/run/docker.sock:/var/run/docker.sock" --clone-url "http://gitlab"
+
+
+#podman cp config.toml gitlab-runner:/etc/gitlab-runner/config.toml
+#podman exec gitlab-runner cat /etc/gitlab-runner/config.toml
+#podman restart gitlab-runner
